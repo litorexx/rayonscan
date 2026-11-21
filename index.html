@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>РайонСкан — проверка района перед арендой</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--ink:#12262F;--paper:#EEF3F3;--line:#C7D4D5;--muted:#4F6670;--blue:#2347D8;--good:#18835A;--mid:#B77F05;--bad:#C13A2A;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.5 Onest,system-ui,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:12px 16px 32px}
+header{display:flex;align-items:center;gap:10px;padding:8px 0}
+header b{font-size:22px;font-weight:800;letter-spacing:-.01em}
+h1{font-size:27px;line-height:1.15;font-weight:800;margin:12px 0 6px;letter-spacing:-.02em}
+h2{font-size:19px;margin:0 0 10px;font-weight:800}
+.lead{color:var(--muted);margin:0 0 16px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:16px}
+label{display:block;font-weight:600;font-size:14px;margin:0 0 12px}
+input[type=text],input[inputmode]{width:100%;margin-top:6px;padding:12px 14px;font:inherit;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #2347D866;outline-offset:1px}
+button{font-family:inherit}
+.primary{width:100%;padding:14px;border:0;border-radius:12px;background:var(--blue);color:#fff;font-weight:800;font-size:17px;cursor:pointer}
+.primary[disabled]{opacity:.6;cursor:wait}
+.ghost{background:none;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:600;font-size:14px;color:var(--ink);cursor:pointer}
+details{margin:0 0 14px}summary{cursor:pointer;font-weight:600;font-size:14px}
+.sl{display:grid;grid-template-columns:120px 1fr 30px;align-items:center;gap:8px;margin-top:8px;font-size:14px}
+#st{min-height:22px;margin:10px 0 0;color:var(--muted);font-size:14px}#st.e{color:var(--bad);font-weight:600}
+.head{display:flex;gap:16px;align-items:center}
+.num{font-size:68px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.good{color:var(--good)}.mid{color:var(--mid)}.bad{color:var(--bad)}
+.verdict{font-size:20px;font-weight:800}.sub{color:var(--muted);font-size:14px}
+.cols{display:grid;grid-template-columns:1fr;gap:12px;margin:14px 0}
+@media(min-width:600px){.cols{grid-template-columns:300px 1fr;align-items:center}}
+.idx{list-style:none;margin:0;padding:0}.idx li{margin:0 0 10px}
+.idx .r{display:flex;justify-content:space-between;font-weight:600;font-size:15px}
+.bar{height:8px;border-radius:4px;background:#E3EBEB;margin-top:4px;overflow:hidden}.bar i{display:block;height:100%}
+.facts{margin:10px 0 0;padding-left:18px;font-size:14px}.facts li{margin:3px 0}
+#map{height:320px;border-radius:12px;border:1px solid var(--line);margin-top:12px}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+th{font-weight:600}td b{font-weight:800}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;text-decoration:underline}
+.acts{display:flex;gap:8px;margin-top:14px}
+footer{color:var(--muted);font-size:12.5px;line-height:1.45}
+[hidden]{display:none!important}
+@media print{header,#form,.acts,.x,footer .noprint{display:none!important}body{background:#fff}.panel{border:0;padding:0}.wrap{padding:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15" fill="none" stroke="#2347D8" stroke-width="2"/><circle cx="17" cy="17" r="9" fill="none" stroke="#2347D8" stroke-width="2" opacity=".6"/><path d="M17 17 L30 9 A15 15 0 0 1 32 17Z" fill="#2347D8" opacity=".25"/><circle cx="17" cy="17" r="3" fill="#F26B21"/></svg>
+  <b>РайонСкан</b>
+</header>
+<h1>Проверьте район до того, как поедете смотреть квартиру</h1>
+<p class="lead">Введите адрес и свой вуз: покажем дорогу до учёбы, магазины и остановки рядом, шум и экологию.</p>
+
+<form id="form" class="panel" autocomplete="off">
+  <label>Адрес квартиры<input type="text" id="addr" placeholder="Город, улица, дом" required></label>
+  <label>Вуз (название или адрес)<input type="text" id="uni" placeholder="Например: СКФУ, Ставрополь"></label>
+  <label>Цена аренды, руб. в месяц (необязательно)<input type="text" inputmode="numeric" id="price" placeholder="25000"></label>
+  <details><summary>Что для меня важнее</summary>
+    <div class="sl"><span>Дорога до вуза</span><input type="range" id="w_uni" min="0" max="100" value="35"><span id="v_uni">35</span></div>
+    <div class="sl"><span>Инфраструктура</span><input type="range" id="w_infra" min="0" max="100" value="25"><span id="v_infra">25</span></div>
+    <div class="sl"><span>Тишина</span><input type="range" id="w_noise" min="0" max="100" value="20"><span id="v_noise">20</span></div>
+    <div class="sl"><span>Экология</span><input type="range" id="w_eco" min="0" max="100" value="20"><span id="v_eco">20</span></div>
+  </details>
+  <button class="primary" id="go" type="submit">Проверить район</button>
+  <p id="st" role="status" aria-live="polite"></p>
+</form>
+
+<section id="res" class="panel" hidden>
+  <div class="head"><div class="num" id="tot"></div><div><div class="verdict" id="ver"></div><div class="sub" id="adr"></div></div></div>
+  <div class="cols"><div id="radar"></div><ul class="idx" id="idx"></ul></div>
+  <ul class="facts" id="facts"></ul>
+  <div id="map"></div>
+  <p class="note">Точки: синие — остановки, зелёные — магазины, розовые — аптеки, жёлтые — кафе, тёмно-зелёные — парки и вода, красные — промзоны и свалки. Оранжевые линии — магистрали, серые — железная дорога.</p>
+  <div class="acts"><button class="ghost" type="button" id="pdf">Сохранить отчёт в PDF</button></div>
+</section>
+
+<section id="cmp" class="panel" hidden>
+  <h2>Сравнение адресов</h2>
+  <div id="cmpr"></div><div id="cmpt" style="overflow-x:auto"></div>
+  <p class="note">Можно сравнить до трёх адресов: проверьте следующий, и он появится рядом.</p>
+</section>
+
+<footer>
+  <p>Данные: © участники OpenStreetMap, лицензия ODbL. Индексы шума и экологии — оценка по косвенным признакам (дороги, железные дороги, промзоны, зелёные зоны), а не измерения. Время на транспорте — приблизительная оценка. Полнота данных зависит от города.</p>
+  <p class="noprint">Учебный проект СКФУ, прототип.</p>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(()=>{
+const $=s=>document.querySelector(s);
+const NOM='https://nominatim.openstreetmap.org/search';
+const OVP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+const AX=[['uni','Дорога до вуза'],['infra','Инфраструктура'],['noise','Тишина'],['eco','Экология']];
+const COL=['#2347D8','#F26B21','#18835A'];
+const PC={bus:'#2347D8',shop:'#18835A',pharm:'#D6338A',food:'#E0A100',park:'#0B5D3B',bad:'#C13A2A'};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const clamp=(x,a=0,b=100)=>Math.max(a,Math.min(b,x));
+const rad=x=>x*Math.PI/180;
+const hav=(a,b,c,d)=>{const h=Math.sin(rad(c-a)/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(rad(d-b)/2)**2;return 12742000*Math.asin(Math.sqrt(h))};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let R=[],map=null,layer=null;
+
+function dPoly(lat,lon,g){const k=Math.cos(rad(lat)),m=111320;const P=g.map(p=>[(p.lon-lon)*k*m,(p.lat-lat)*m]);let best=Math.hypot(P[0][0],P[0][1]);
+  for(let i=0;i<P.length-1;i++){const[x1,y1]=P[i],[x2,y2]=P[i+1],dx=x2-x1,dy=y2-y1,l=dx*dx+dy*dy;const t=l?clamp(-(x1*dx+y1*dy)/l,0,1):0;best=Math.min(best,Math.hypot(x1+t*dx,y1+t*dy))}
+  return best}
+
+async function geocode(q){
+  const r=await fetch(`${NOM}?format=jsonv2&limit=1&countrycodes=ru&accept-language=ru&q=${encodeURIComponent(q)}`);
+  if(!r.ok)throw new Error('Сервис поиска адресов сейчас недоступен. Попробуйте через минуту.');
+  const j=await r.json();return j.length?{lat:+j[0].lat,lon:+j[0].lon,name:j[0].display_name}:null}
+
+async function route(a,b){
+  try{const r=await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`);
+    const j=await r.json();if(j.code==='Ok')return{m:j.routes[0].distance,min:j.routes[0].duration/60,est:false}}catch(e){}
+  const m=hav(a.lat,a.lon,b.lat,b.lon)*1.3;return{m,min:m/80,est:true}}
+
+async function overpass(lat,lon){
+  const p=(r,f)=>`nwr(around:${r},${lat},${lon})${f};`;
+  const q=`[out:json][timeout:25];(way(around:400,${lat},${lon})[highway~"^(motorway|trunk|primary|secondary)$"];way(around:400,${lat},${lon})[railway~"^(rail|light_rail)$"];);out geom;(`+
+   p(800,'[highway=bus_stop]')+p(800,'[railway~"^(tram_stop|station|halt)$"]')+p(800,'[shop~"^(supermarket|convenience|mall)$"]')+p(800,'[amenity=pharmacy]')+
+   p(800,'[amenity~"^(cafe|restaurant|fast_food|canteen)$"]')+p(800,'[leisure~"^(park|garden)$"]')+p(600,'[landuse~"^(forest|recreation_ground)$"]')+p(600,'[natural~"^(wood|water)$"]')+
+   p(600,'[landuse=industrial]')+p(1500,'[landuse~"^(landfill|quarry)$"]')+p(1500,'[power=plant]')+');out center tags;';
+  for(const ep of OVP){try{const r=await fetch(ep,{method:'POST',body:'data='+encodeURIComponent(q)});if(r.ok)return(await r.json()).elements||[]}catch(e){}}
+  throw new Error('Сервер карт перегружен. Подождите минуту и нажмите «Проверить район» ещё раз.')}
+
+function analyze(els,a){
+  const C={bus:[],shop:[],pharm:[],food:[],park:[],green:[],water:[],ind:[],bad:[],power:[]};let r1=1e9,r2=1e9,r3=1e9,rail=1e9;const lines=[];
+  for(const e of els){const t=e.tags||{};
+    if(e.geometry&&e.geometry.length){const d=dPoly(a.lat,a.lon,e.geometry);
+      if(t.railway)rail=Math.min(rail,d);else if(/motorway|trunk/.test(t.highway))r1=Math.min(r1,d);else if(t.highway==='primary')r2=Math.min(r2,d);else r3=Math.min(r3,d);
+      lines.push({g:e.geometry.map(p=>[p.lat,p.lon]),k:t.railway?'rail':'road'});continue}
+    const c=e.center||e;if(c.lat==null)continue;const it={d:hav(a.lat,a.lon,c.lat,c.lon),lat:c.lat,lon:c.lon};
+    if(t.highway==='bus_stop'||t.railway)C.bus.push(it);else if(t.shop)C.shop.push(it);else if(t.amenity==='pharmacy')C.pharm.push(it);else if(t.amenity)C.food.push(it);
+    else if(t.leisure)C.park.push(it);else if(t.landuse==='industrial')C.ind.push(it);else if(t.landuse==='landfill'||t.landuse==='quarry')C.bad.push(it);
+    else if(t.power)C.power.push(it);else if(t.natural==='water')C.water.push(it);else C.green.push(it)}
+  const n=(arr,m)=>arr.filter(x=>x.d<=m).length, mn=arr=>arr.length?Math.min(...arr.map(x=>x.d)):1e9;
+  const pen=(d,t)=>{for(const[l,p]of t)if(d<l)return p;return 0};
+  const bus=n(C.bus,500),shop=n(C.shop,800),ph=n(C.pharm,800),fd=n(C.food,800),pk=n(C.park,800),gr=n(C.park,500)+n(C.green,600),wt=n(C.water,600),ind=mn(C.ind),bad=mn(C.bad),pw=mn(C.power);
+  const infra=Math.round(Math.min(bus,3)/3*30+Math.min(shop,3)/3*30+(ph?15:0)+Math.min(fd,2)/2*15+(pk?10:0));
+  const noise=clamp(100-pen(r1,[[50,45],[150,30],[300,15]])-pen(r2,[[30,30],[100,20],[200,10]])-pen(r3,[[30,15],[80,8]])-pen(rail,[[100,30],[250,18],[400,8]])-pen(ind,[[150,20],[300,12]]));
+  const eco=clamp(50+Math.min(gr,3)*10+(wt?8:0)+(mn(C.park)<300?10:0)-(n(C.ind,500)>1?25:ind<500?20:0)-(bad<1000?20:bad<1500?10:0)-(pw<1500?10:0)-(r1<100?8:0));
+  const f=[`Остановки в 500 м: ${bus}`,`Магазины в 800 м: ${shop}, аптеки: ${ph}, кафе и столовые: ${fd}`,`Парки и скверы в 800 м: ${pk}`];
+  const ns=[];if(r1<300)ns.push(`магистраль в ${Math.round(r1)} м`);if(r2<200)ns.push(`крупная дорога в ${Math.round(r2)} м`);if(rail<400)ns.push(`железная дорога в ${Math.round(rail)} м`);if(ind<300)ns.push(`промзона в ${Math.round(ind)} м`);
+  f.push(ns.length?'Шум: '+ns.join(', '):'Шум: крупных источников рядом не найдено');
+  const es=[];if(n(C.ind,500))es.push('промзона в 500 м');if(bad<1500)es.push(`свалка или карьер в ${Math.round(bad)} м`);if(pw<1500)es.push('электростанция рядом');
+  f.push(es.length?'Экология: '+es.join(', '):'Экология: промышленных объектов рядом не найдено');
+  const pts=[];const add=(arr,k,m)=>arr.filter(x=>x.d<=m).forEach(x=>pts.push({lat:x.lat,lon:x.lon,k}));
+  add(C.bus,'bus',500);add(C.shop,'shop',800);add(C.pharm,'pharm',800);add(C.food,'food',800);add(C.park,'park',800);add(C.water,'park',600);add(C.ind,'bad',600);add(C.bad,'bad',1500);
+  return{idx:{infra,noise,eco},facts:f,lines,pts}}
+
+const W=()=>Object.fromEntries(AX.map(([k])=>[k,+$('#w_'+k).value]));
+function total(r){const w=W();let s=0,t=0;for(const[k]of AX){if(r.idx[k]==null)continue;s+=w[k]*r.idx[k];t+=w[k]}return t?Math.round(s/t):0}
+const verdict=t=>t>=75?['Отличный вариант','good']:t>=55?['Хороший вариант, есть нюансы','mid']:t>=35?['Есть серьёзные минусы','bad']:['Лучше поискать другой','bad'];
+const cls=v=>v>=70?'good':v>=45?'mid':'bad';
+const colv=v=>`var(--${cls(v)})`;
+
+function radar(rs){const S=300,H=250,cx=150,cy=125,Rr=78,ord=['infra','noise','eco','uni'],dir=[[0,-1],[1,0],[0,1],[-1,0]];
+  const pt=(i,v)=>`${cx+dir[i][0]*Rr*v/100},${cy+dir[i][1]*Rr*v/100}`;
+  let g=[25,50,75,100].map(l=>`<polygon points="${dir.map((_,i)=>pt(i,l)).join(' ')}" fill="none" stroke="#C7D4D5"/>`).join('')+dir.map((_,i)=>`<line x1="${cx}" y1="${cy}" x2="${pt(i,100).split(',')[0]}" y2="${pt(i,100).split(',')[1]}" stroke="#C7D4D5"/>`).join('');
+  g+=rs.map((r,j)=>`<polygon points="${ord.map((k,i)=>pt(i,r.idx[k]??0)).join(' ')}" fill="${COL[j]}" fill-opacity=".16" stroke="${COL[j]}" stroke-width="2.5" stroke-linejoin="round"/>`).join('');
+  const L=`<g font-size="12.5" font-weight="600" fill="#12262F"><text x="150" y="${cy-Rr-9}" text-anchor="middle">Инфраструктура</text><text x="${cx+Rr+8}" y="${cy+4}">Тишина</text><text x="150" y="${cy+Rr+20}" text-anchor="middle">Экология</text><text x="${cx-Rr-8}" y="${cy+4}" text-anchor="end">Вуз</text></g>`;
+  return`<svg viewBox="0 0 ${S} ${H}" width="100%" role="img" aria-label="Диаграмма индексов района">${g}${L}</svg>`}
+
+function render(){
+  const r=R[R.length-1];if(!r)return;$('#res').hidden=false;
+  const t=total(r),[v,c]=verdict(t);
+  $('#tot').textContent=t;$('#tot').className='num '+c;$('#ver').textContent=v;$('#ver').className='verdict '+c;$('#adr').textContent=r.label+(r.price?` · ${r.price.toLocaleString('ru-RU')} руб./мес.`:'');
+  $('#radar').innerHTML=radar([r]);
+  $('#idx').innerHTML=AX.map(([k,n])=>{const val=r.idx[k];const note=k==='uni'?(r.walk?`${Math.round(Math.min(r.walk.min,r.trip))} мин в пути`:'вуз не указан'):'';
+    return val==null?`<li><div class="r"><span>${n}</span><span>—</span></div><div class="sub">${note}</div></li>`:`<li><div class="r"><span>${n}</span><span style="color:${colv(val)}">${val}</span></div><div class="bar"><i style="width:${val}%;background:${colv(val)}"></i></div>${note?`<div class="sub">${note}</div>`:''}</li>`}).join('');
+  const fx=r.facts.slice();if(r.walk)fx.unshift(`До вуза: ${Math.round(r.walk.min)} мин пешком (${(r.walk.m/1000).toFixed(1)} км${r.walk.est?', по прямой, оценка':''}); на транспорте около ${Math.round(r.trip)} мин (оценка)`);
+  $('#facts').innerHTML=fx.map(x=>`<li>${esc(x)}</li>`).join('');
+  drawMap(r);
+  const cm=$('#cmp');cm.hidden=R.length<2;
+  if(R.length>1){$('#cmpr').innerHTML=radar(R);
+    const row=(n,f)=>`<tr><th>${n}</th>${R.map((r,j)=>`<td>${f(r,j)}</td>`).join('')}</tr>`;
+    $('#cmpt').innerHTML='<table><tr><th></th>'+R.map((r,j)=>`<th><span class="swatch" style="background:${COL[j]}"></span>${esc(r.label)}<br><button class="x" data-i="${j}" type="button">убрать</button></th>`).join('')+'</tr>'+
+      row('Итог',r=>`<b>${total(r)}</b>`)+AX.map(([k,n])=>row(n,r=>r.idx[k]==null?'—':r.idx[k])).join('')+row('Цена',r=>r.price?r.price.toLocaleString('ru-RU')+' руб.':'—')+'</table>'}}
+
+function drawMap(r){
+  const m=$('#map');
+  if(!window.L){m.outerHTML='<p class="note" id="map">Карта не загрузилась, но индексы посчитаны.</p>';return}
+  if(!map){map=L.map('map',{scrollWheelZoom:false});L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© участники <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);layer=L.layerGroup().addTo(map)}
+  layer.clearLayers();const b=[[r.a.lat,r.a.lon]];
+  r.lines.forEach(l=>L.polyline(l.g,{color:l.k==='rail'?'#6B7C84':'#F26B21',weight:l.k==='rail'?3:5,opacity:.75}).addTo(layer));
+  r.pts.forEach(p=>L.circleMarker([p.lat,p.lon],{radius:5,color:'#fff',weight:1,fillColor:PC[p.k],fillOpacity:.95}).addTo(layer));
+  L.circle([r.a.lat,r.a.lon],{radius:500,color:'#2347D8',weight:1,fill:false,dashArray:'4 4'}).addTo(layer);
+  L.circleMarker([r.a.lat,r.a.lon],{radius:10,color:'#fff',weight:3,fillColor:'#2347D8',fillOpacity:1}).bindTooltip('Квартира').addTo(layer);
+  if(r.u){L.circleMarker([r.u.lat,r.u.lon],{radius:10,color:'#fff',weight:3,fillColor:'#F26B21',fillOpacity:1}).bindTooltip('Вуз').addTo(layer);L.polyline([[r.a.lat,r.a.lon],[r.u.lat,r.u.lon]],{color:'#12262F',weight:2,dashArray:'6 6'}).addTo(layer);if(hav(r.a.lat,r.a.lon,r.u.lat,r.u.lon)<6000)b.push([r.u.lat,r.u.lon])}
+  map.invalidateSize();map.fitBounds(L.latLngBounds(b).pad(.35),{maxZoom:16});if(b.length===1)map.setView(b[0],15)}
+
+const say=(t,e)=>{const s=$('#st');s.textContent=t;s.className=e?'e':''};
+function cache(k,v){try{if(v){localStorage.setItem('rs:'+k.toLowerCase(),JSON.stringify(v))}else{return JSON.parse(localStorage.getItem('rs:'+k.toLowerCase()))}}catch(e){}return null}
+
+async function check(ev){
+  ev.preventDefault();const aq=$('#addr').value.trim(),uq=$('#uni').value.trim();if(!aq){say('Введите адрес квартиры: город, улица, дом.',1);return}
+  const go=$('#go');go.disabled=true;
+  try{
+    say('Ищу адрес…');const a=await geocode(aq);if(!a){say('Не нашёл такой адрес. Добавьте город, например: «Ставрополь, ул. Ленина, 10».',1);return}
+    let u=null,walk=null;
+    if(uq){u=cache(uq);if(!u){say('Ищу вуз…');await sleep(1100);u=await geocode(uq);if(!u){say('Не нашёл вуз. Напишите название и город: «СКФУ, Ставрополь», или адрес корпуса.',1);return}cache(uq,u)}
+      say('Считаю дорогу до вуза…');walk=await route(a,u)}
+    say('Загружаю данные карты вокруг дома…');const an=analyze(await overpass(a.lat,a.lon),a);
+    const trip=walk?walk.m/300+7:null;const uniIdx=walk?Math.round(clamp(100-(Math.min(walk.min,trip)-15)/30*100)):null;
+    const pr=parseInt($('#price').value.replace(/\D/g,''),10)||null;
+    R.push({a,u,walk,trip,label:aq,price:pr,idx:{uni:uniIdx,...an.idx},facts:an.facts,lines:an.lines,pts:an.pts});if(R.length>3)R.shift();
+    say('');render();$('#res').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){say(e.message||'Что-то пошло не так. Проверьте интернет и попробуйте ещё раз.',1)}
+  finally{go.disabled=false}}
+
+$('#form').addEventListener('submit',check);
+$('#pdf').addEventListener('click',()=>window.print());
+$('#cmpt').addEventListener('click',e=>{const i=e.target.dataset&&e.target.dataset.i;if(i==null)return;R.splice(+i,1);if(R.length)render();else{$('#res').hidden=true;$('#cmp').hidden=true}});
+AX.forEach(([k])=>$('#w_'+k).addEventListener('input',e=>{$('#v_'+k).textContent=e.target.value;render()}));
+})();
+</script>
+</body>
+</html>
