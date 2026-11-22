@@ -1464,7 +1464,7 @@ footer{padding:22px 0 8px;color:var(--muted);font-size:12px;line-height:1.5;bord
   /* ---------- Overpass ---------- */
   function query(lat, lon) {
     const p = (r, f) => `nwr(around:${r},${lat},${lon})${f};`;
-    return `[out:json][timeout:20];(` +
+    return `[out:json][timeout:50];(` +
       `way(around:450,${lat},${lon})[highway~"^(motorway|trunk|primary|secondary)$"];` +
       `way(around:450,${lat},${lon})[railway~"^(rail|light_rail)$"];` +
       `);out geom;(` +
@@ -1477,52 +1477,13 @@ footer{padding:22px 0 8px;color:var(--muted);font-size:12px;line-height:1.5;bord
       `);out center tags;`;
   }
 
-  // Облегчённый вариант: только объекты (без геометрии дорог). Нужен, когда полный запрос не проходит.
-  function queryLight(lat, lon) {
-    const p = (r, f) => `nwr(around:${r},${lat},${lon})${f};`;
-    return `[out:json][timeout:15];(` +
-      p(800, '[highway=bus_stop]') + p(800, '[railway~"^(tram_stop|station|halt)$"]') +
-      p(800, '[shop~"^(supermarket|convenience|mall)$"]') +
-      p(800, '[amenity=pharmacy]') + p(800, '[shop=chemist]') + p(800, '[healthcare=pharmacy]') +
-      p(800, '[amenity~"^(cafe|restaurant|fast_food|canteen)$"]') + p(800, '[leisure~"^(park|garden)$"]') +
-      p(600, '[landuse~"^(forest|recreation_ground)$"]') + p(600, '[natural~"^(wood|water)$"]') +
-      p(600, '[landuse=industrial]') + p(1500, '[landuse~"^(landfill|quarry)$"]') + p(1500, '[power=plant]') +
-      `);out center tags;`;
-  }
-
-  // Крайний случай: Overpass недоступен совсем. Берём ближайшие объекты из Nominatim
-  // (он работает отдельно). Дорог в таком ответе нет, поэтому шум не считаем.
-  async function elementsNominatim(lat, lon) {
-    const d = 0.012;                                    // примерно 1,2–1,3 км
-    const vb = `${lon - d},${lat - d},${lon + d},${lat + d}`;
-    const cats = [
-      ['pharmacy', { amenity: 'pharmacy' }],
-      ['supermarket', { shop: 'supermarket' }],
-      ['park', { leisure: 'park' }],
-      ['cafe', { amenity: 'cafe' }],
-      ['bus_stop', { highway: 'bus_stop' }]
-    ];
-    const out = [];
-    for (const [cat, tags] of cats) {
-      try {
-        const url = `${NOM}?format=jsonv2&limit=50&bounded=1&viewbox=${vb}&countrycodes=ru&accept-language=ru&q=${encodeURIComponent(cat)}`;
-        const r = await fetch(url, { headers: { Accept: 'application/json' } });
-        if (!r.ok) continue;
-        const j = await r.json();
-        for (const o of j) out.push({ t: tags, c: [+o.lat, +o.lon] });
-      } catch (e) { /* пропускаем категорию */ }
-      await sleep(150);
-    }
-    return out;
-  }
-
   async function overpassRaw(q) {
     const body = 'data=' + encodeURIComponent(q);
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Accept: 'application/json' };
     const ctrls = [];
     const one = ep => new Promise((resolve, reject) => {
       const ctrl = new AbortController(); ctrls.push(ctrl);
-      const to = setTimeout(() => { ctrl.abort(); reject(new Error('timeout')); }, 8000);
+      const to = setTimeout(() => { ctrl.abort(); reject(new Error('timeout')); }, 60000);
       fetch(ep, { method: 'POST', body, headers, signal: ctrl.signal })
         .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(j => {
@@ -1552,7 +1513,7 @@ footer{padding:22px 0 8px;color:var(--muted);font-size:12px;line-height:1.5;bord
   const inflight = new Map();   // одинаковые запросы не дублируем
 
   async function elements(lat, lon) {
-    const key = `ovp:${lat.toFixed(3)},${lon.toFixed(3)}`;
+    const key = `ovp2:${lat.toFixed(3)},${lon.toFixed(3)}`;
     const hit = cget(key); if (hit) return { els: hit, light: false };
     if (inflight.has(key)) return inflight.get(key);
     const job = elementsLoad(lat, lon, key);
@@ -1562,23 +1523,15 @@ footer{padding:22px 0 8px;color:var(--muted);font-size:12px;line-height:1.5;bord
 
   async function elementsLoad(lat, lon, key) {
     const tag = () => '/*' + Math.random().toString(36).slice(2) + '*/';
-    let raw = null, light = false;
-    for (let i = 0; i < 2 && !raw; i++) {
+    let raw = null;
+    for (let i = 0; i < 3 && !raw; i++) {
       try { raw = await overpassRaw(tag() + query(lat, lon)); }
-      catch (e) { if (i < 1) await sleep(1200); }
+      catch (e) { if (i < 2) await sleep(2500); }
     }
-    if (!raw) {                                  // не вышло — пробуем облегчённый запрос
-      light = true;
-      try { raw = await overpassRaw(tag() + queryLight(lat, lon)); } catch (e) { raw = null; }
-    }
-    if (!raw) {                                  // Overpass молчит совсем — идём в Nominatim
-      const alt = await elementsNominatim(lat, lon);
-      if (alt.length) { cset(key, alt); return { els: alt, light: true }; }
-      throw new Error('Серверы карт не ответили. Попробуйте ещё раз через минуту.');
-    }
+    if (!raw) throw new Error('Серверы карт не ответили. Подождите минуту и нажмите «Проверить район» ещё раз.');
     const els = raw.map(slim).filter(Boolean);
     cset(key, els);
-    return { els, light };
+    return { els, light: false };
   }
 
   /* ---------- маршрут ---------- */
@@ -1693,7 +1646,7 @@ footer{padding:22px 0 8px;color:var(--muted);font-size:12px;line-height:1.5;bord
         infra: [bus ? bus + ' ' + plural(bus, 'остановка', 'остановки', 'остановок') + ' в 500 м' : 'остановок рядом нет',
           shop ? shop + ' ' + plural(shop, 'магазин', 'магазина', 'магазинов') : 'магазинов нет',
           ph ? ph + ' ' + plural(ph, 'аптека', 'аптеки', 'аптек') : 'аптек нет'].join(' · '),
-        noise: !hasRoads ? 'нет данных о дорогах — серверы карт не ответили'
+        noise: !hasRoads ? 'в OpenStreetMap нет дорог рядом с этой точкой'
           : (whyNoise.length ? whyNoise.join(', ') : 'крупных источников шума рядом нет'),
         eco: whyEco.length ? whyEco.join(', ') : 'зелени и воды рядом мало'
       },
@@ -1864,7 +1817,7 @@ footer{padding:22px 0 8px;color:var(--muted);font-size:12px;line-height:1.5;bord
       src.hidden = false;
     } else { src.hidden = true; src.textContent = ''; }
     if (r.idx.noise == null) {                       // данные пришли неполные — говорим прямо
-      src.innerHTML = 'шум не удалось посчитать: серверы карт не ответили, индекс не учтён';
+      src.innerHTML = 'шум не посчитан: рядом с точкой нет данных о дорогах в OpenStreetMap';
       src.hidden = false;
     }
 
